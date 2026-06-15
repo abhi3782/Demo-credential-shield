@@ -327,7 +327,7 @@ Keep the email professional, on-brand for DHL, and avoid alarmist language that 
         with st.spinner("🤖 Gemini AI is crafting your personalised security alert..."):
             try:
                 genai.configure(api_key=api_key)
-                model = genai.GenerativeModel("gemini-1.5-flash")
+                model = genai.GenerativeModel("gemini-2.0-flash")
 
                 t0 = time.time()
                 response = model.generate_content(prompt)
