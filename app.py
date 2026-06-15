@@ -1,8 +1,6 @@
 import streamlit as st
-import anthropic
-import json
 import time
-from datetime import datetime
+import google.generativeai as genai
 
 # ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -19,7 +17,6 @@ st.markdown("""
 
   html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 
-  /* DHL red + yellow palette */
   :root {
     --dhl-red:    #D40511;
     --dhl-yellow: #FFCC00;
@@ -28,10 +25,8 @@ st.markdown("""
     --dhl-mid:    #6B6B6B;
   }
 
-  /* Hide default Streamlit chrome */
   #MainMenu, footer, header { visibility: hidden; }
 
-  /* Top banner */
   .top-banner {
     background: var(--dhl-red);
     color: white;
@@ -55,7 +50,6 @@ st.markdown("""
     letter-spacing: 0.5px;
   }
 
-  /* Section cards */
   .section-card {
     background: white;
     border: 1px solid #E8E8E8;
@@ -73,13 +67,11 @@ st.markdown("""
     margin-bottom: 14px;
   }
 
-  /* Risk badges */
   .risk-critical { background:#FFEAEA; color:#C0000C; border:1px solid #F5AAAA; padding:3px 10px; border-radius:20px; font-size:0.75rem; font-weight:600; }
   .risk-high     { background:#FFF3E0; color:#E65100; border:1px solid #FFCC80; padding:3px 10px; border-radius:20px; font-size:0.75rem; font-weight:600; }
   .risk-medium   { background:#FFFDE7; color:#827717; border:1px solid #FFF176; padding:3px 10px; border-radius:20px; font-size:0.75rem; font-weight:600; }
   .risk-low      { background:#E8F5E9; color:#1B5E20; border:1px solid #A5D6A7; padding:3px 10px; border-radius:20px; font-size:0.75rem; font-weight:600; }
 
-  /* Email preview box */
   .email-preview {
     background: #FAFAFA;
     border: 1px solid #DCDCDC;
@@ -102,7 +94,6 @@ st.markdown("""
     margin-bottom: 14px;
   }
 
-  /* Metric tiles */
   .metric-row { display:flex; gap:14px; margin-bottom:20px; flex-wrap:wrap; }
   .metric-tile {
     flex:1; min-width:120px;
@@ -115,7 +106,6 @@ st.markdown("""
   .metric-value { font-size:1.6rem; font-weight:700; color: var(--dhl-red); }
   .metric-label { font-size:0.72rem; color: var(--dhl-mid); font-weight:500; margin-top:2px; }
 
-  /* CTA button style override */
   .stButton > button {
     background: var(--dhl-red) !important;
     color: white !important;
@@ -128,7 +118,6 @@ st.markdown("""
   }
   .stButton > button:hover { opacity: 0.88 !important; }
 
-  /* Disclaimer */
   .disclaimer {
     background: #FFF8E1;
     border-left: 4px solid var(--dhl-yellow);
@@ -139,7 +128,6 @@ st.markdown("""
     margin-bottom: 20px;
   }
 
-  /* Comparison columns */
   .compare-label {
     font-size: 0.72rem; font-weight:700; letter-spacing:1px;
     text-transform:uppercase; margin-bottom:8px;
@@ -155,7 +143,7 @@ st.markdown("""
   <span class="logo">DHL</span>
   <div>
     <div class="title">CredentialShield AI &nbsp;🛡️</div>
-    <div style="font-size:0.75rem;opacity:0.8">Dark Web Breach Response · Powered by Claude AI</div>
+    <div style="font-size:0.75rem;opacity:0.8">Dark Web Breach Response · Powered by Gemini AI</div>
   </div>
   <div class="badge">⚠️ DEMO — SIMULATED DATA ONLY</div>
 </div>
@@ -226,23 +214,18 @@ RISK_COLORS = {
     "Low": "risk-low",
 }
 
-# ── Layout: two columns ─────────────────────────────────────────────────────────
+# ── Layout ──────────────────────────────────────────────────────────────────────
 col_left, col_right = st.columns([1, 1.6], gap="large")
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# LEFT — Setup panel
-# ═══════════════════════════════════════════════════════════════════════════════
 with col_left:
 
-    # API key
     st.markdown('<div class="section-card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-title">🔑 Anthropic API Key</div>', unsafe_allow_html=True)
-    api_key = st.text_input("", type="password", placeholder="sk-ant-...", label_visibility="collapsed")
+    st.markdown('<div class="section-title">🔑 Google Gemini API Key</div>', unsafe_allow_html=True)
+    api_key = st.text_input("", type="password", placeholder="AIzaSy...", label_visibility="collapsed")
     if not api_key:
-        st.caption("Get your free key → console.anthropic.com")
+        st.caption("Get your free key → aistudio.google.com")
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Metrics summary
     st.markdown("""
     <div class="metric-row">
       <div class="metric-tile"><div class="metric-value">4</div><div class="metric-label">Accounts at Risk</div></div>
@@ -252,7 +235,6 @@ with col_left:
     </div>
     """, unsafe_allow_html=True)
 
-    # Customer selector
     st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.markdown('<div class="section-title">👤 Select Affected Customer</div>', unsafe_allow_html=True)
 
@@ -263,7 +245,6 @@ with col_left:
     )
     selected = MOCK_CUSTOMERS[[c['id'] for c in MOCK_CUSTOMERS].index(selected_name.split(" · ")[0])]
 
-    # Customer profile card
     risk_cls = RISK_COLORS[selected["risk"]]
     st.markdown(f"""
     <div style="background:#F9F9F9;border-radius:8px;padding:14px 16px;margin-top:10px;font-size:0.83rem;line-height:2">
@@ -280,13 +261,11 @@ with col_left:
     """, unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Language selector
     st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.markdown('<div class="section-title">🌐 Email Language</div>', unsafe_allow_html=True)
     language = st.selectbox("", ["English", "German", "Spanish", "Hindi", "French", "Mandarin Chinese"], label_visibility="collapsed")
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Tone selector
     st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.markdown('<div class="section-title">🎚️ Tone</div>', unsafe_allow_html=True)
     tone = st.radio("", ["Urgent & Direct", "Professional & Calm", "Friendly & Reassuring"], label_visibility="collapsed", horizontal=True)
@@ -294,9 +273,6 @@ with col_left:
 
     generate_btn = st.button("⚡ Generate AI Security Alert", use_container_width=True)
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# RIGHT — Output panel
-# ═══════════════════════════════════════════════════════════════════════════════
 with col_right:
 
     if not generate_btn:
@@ -309,10 +285,9 @@ with col_right:
         """, unsafe_allow_html=True)
 
     elif not api_key:
-        st.error("Please enter your Anthropic API key in the left panel.")
+        st.error("Please enter your Google Gemini API key in the left panel.")
 
     else:
-        # ── Build prompt ──────────────────────────────────────────────────────
         prompt = f"""You are a senior cybersecurity communications specialist at DHL Express, responsible for customer data protection across 220+ countries.
 
 A dark web credential monitoring system has detected that the following DHL customer's credentials appear in a breach database. Write a personalised security alert email to this customer.
@@ -349,25 +324,20 @@ A 3-bullet AI analysis explaining:
 
 Keep the email professional, on-brand for DHL, and avoid alarmist language that could cause panic."""
 
-        # ── Call Claude API ───────────────────────────────────────────────────
-        with st.spinner("🤖 Claude is crafting your personalised security alert..."):
+        with st.spinner("🤖 Gemini AI is crafting your personalised security alert..."):
             try:
-                client = anthropic.Anthropic(api_key=api_key)
-                t0 = time.time()
-                response = client.messages.create(
-                    model="claude-sonnet-4-6",
-                    max_tokens=1500,
-                    messages=[{"role": "user", "content": prompt}],
-                )
-                elapsed = round(time.time() - t0, 1)
-                full_text = response.content[0].text
+                genai.configure(api_key=api_key)
+                model = genai.GenerativeModel("gemini-1.5-flash")
 
-                # Split email from analysis
+                t0 = time.time()
+                response = model.generate_content(prompt)
+                elapsed = round(time.time() - t0, 1)
+                full_text = response.text
+
                 parts = full_text.split("---ANALYSIS---")
                 email_body = parts[0].strip()
                 analysis = parts[1].strip() if len(parts) > 1 else ""
 
-                # Extract subject line if present
                 subject_line = "Urgent: Action Required — Your DHL Account Security"
                 lines = email_body.split("\n")
                 for i, line in enumerate(lines):
@@ -376,7 +346,6 @@ Keep the email professional, on-brand for DHL, and avoid alarmist language that 
                         email_body = "\n".join(lines[i+1:]).strip()
                         break
 
-                # ── Tabs: AI output + before/after comparison ─────────────────
                 tab1, tab2 = st.tabs(["📧 Generated Email", "⚡ Before / After Comparison"])
 
                 with tab1:
@@ -452,10 +421,14 @@ DHL Security Team</div>
                         """, unsafe_allow_html=True)
                     st.markdown('</div>', unsafe_allow_html=True)
 
-            except anthropic.AuthenticationError:
-                st.error("❌ Invalid API key. Please check and re-enter.")
             except Exception as e:
-                st.error(f"Something went wrong: {e}")
+                err = str(e)
+                if "API_KEY_INVALID" in err or "invalid" in err.lower():
+                    st.error("❌ Invalid API key. Please check and re-enter your Gemini key from aistudio.google.com")
+                elif "quota" in err.lower():
+                    st.error("⚠️ Free quota exceeded. Wait a minute and try again — Gemini free tier resets every 60 seconds.")
+                else:
+                    st.error(f"Something went wrong: {e}")
 
 # ── Footer ──────────────────────────────────────────────────────────────────────
 st.markdown("""
